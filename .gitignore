@@ -2,3 +2,7 @@
 __pycache__/
 *.dst
 .pytest_cache/
+
+# Moteur et données générées
+engine/inkstitch/
+data/

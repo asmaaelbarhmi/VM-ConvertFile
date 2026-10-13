@@ -1,0 +1,37 @@
+{
+  "polo_pique": {
+    "nom": "Polo piqué (coton)",
+    "row_spacing_mm": 0.25, "max_stitch_length_mm": 3.0, "expand_mm": 0.2,
+    "underlay": true, "underlay_row_spacing_mm": 2.0, "underlay_inset_mm": 0.4, "underlay_angle_delta": 90,
+    "satin_largeur_max_mm": 7.0, "largeur_mini_mm": 1.0, "surface_mini_mm2": 2.0,
+    "conseil": "Stabilisateur déchirable, sous-couche indispensable sur la maille."
+  },
+  "tshirt_jersey": {
+    "nom": "T-shirt jersey",
+    "row_spacing_mm": 0.28, "max_stitch_length_mm": 3.0, "expand_mm": 0.25,
+    "underlay": true, "underlay_row_spacing_mm": 2.0, "underlay_inset_mm": 0.5, "underlay_angle_delta": 90,
+    "satin_largeur_max_mm": 6.0, "largeur_mini_mm": 1.2, "surface_mini_mm2": 3.0,
+    "conseil": "Tissu extensible : stabilisateur coupé (cut-away), densité réduite."
+  },
+  "sweat_polaire": {
+    "nom": "Sweat / polaire",
+    "row_spacing_mm": 0.22, "max_stitch_length_mm": 3.0, "expand_mm": 0.3,
+    "underlay": true, "underlay_row_spacing_mm": 1.5, "underlay_inset_mm": 0.5, "underlay_angle_delta": 90,
+    "satin_largeur_max_mm": 7.0, "largeur_mini_mm": 1.5, "surface_mini_mm2": 4.0,
+    "conseil": "Poil : sous-couche serrée pour éviter que le tissu ressorte entre les points."
+  },
+  "casquette": {
+    "nom": "Casquette (sergé)",
+    "row_spacing_mm": 0.25, "max_stitch_length_mm": 2.5, "expand_mm": 0.2,
+    "underlay": true, "underlay_row_spacing_mm": 2.0, "underlay_inset_mm": 0.4, "underlay_angle_delta": 90,
+    "satin_largeur_max_mm": 6.0, "largeur_mini_mm": 1.0, "surface_mini_mm2": 2.0,
+    "conseil": "Broder du centre vers l'extérieur ; motif limité par le cadre casquette."
+  },
+  "toile_sac": {
+    "nom": "Toile / sac (coton épais)",
+    "row_spacing_mm": 0.25, "max_stitch_length_mm": 3.5, "expand_mm": 0.15,
+    "underlay": true, "underlay_row_spacing_mm": 2.5, "underlay_inset_mm": 0.3, "underlay_angle_delta": 90,
+    "satin_largeur_max_mm": 8.0, "largeur_mini_mm": 0.8, "surface_mini_mm2": 1.5,
+    "conseil": "Tissu stable : réglages standards."
+  }
+}

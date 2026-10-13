@@ -1,0 +1,21 @@
+# Dépendances d'Ink/Stitch pour un usage sans interface (wxPython remplacé par engine/wxstub)
+pystitch==1.0.1
+lxml<6
+tinycss2<2
+scour<0.38
+cssselect
+pyparsing
+packaging
+pyserial
+requests
+networkx==3.7
+shapely==2.2.0
+platformdirs
+numpy>=2.2
+jinja2>2.9
+colormath2
+flask>=2.2.0
+fonttools
+trimesh>=3.15.2
+xxhash>=4.0.1
+diskcache

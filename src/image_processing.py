@@ -96,6 +96,9 @@ def recadrer_marges(image, tolerance=30):
     recadree = image.crop(boite)
     recadree.format = image.format
     recadree.info = dict(image.info)
+    # Couleur du tissu, mémorisée avant que les marges disparaissent
+    if boite != (0, 0, image.width, image.height):
+        recadree.info["fond_rgb"] = tuple(int(v) for v in fond)
     if "taille_mm" in image.info or image.info.get("dpi"):
         l, h = taille_mm(image)
         recadree.info["taille_mm"] = (l * recadree.width / image.width, h * recadree.height / image.height)
@@ -168,13 +171,20 @@ def couches_couleurs(image, largeur_mm, hauteur_mm, nb_couleurs=None, pas_mm=0.4
     quant = img.quantize(colors=16, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
     index = np.array(quant)
     palette = np.array(quant.getpalette()[: 3 * (index.max() + 1)]).reshape(-1, 3).astype(float)
-    bords = np.concatenate([index[0], index[-1], index[:, 0], index[:, -1]])
-    fond = np.bincount(bords).argmax()  # couleur la plus présente sur les bords = tissu
+    fond_rgb = image.info.get("fond_rgb")
+    if fond_rgb is not None:
+        # Fond connu (mémorisé lors du retrait des marges) : la teinte la plus proche,
+        # si elle est assez proche ; sinon il n'y a pas de fond, tout est brodé.
+        distances = np.linalg.norm(palette - np.array(fond_rgb, dtype=float), axis=1)
+        fond = int(distances.argmin()) if distances.min() < tolerance_fond else None
+    else:
+        bords = np.concatenate([index[0], index[-1], index[:, 0], index[:, -1]])
+        fond = int(np.bincount(bords).argmax())  # couleur la plus présente sur les bords = tissu
 
     # 1. Teintes du motif (hors fond), avec leur surface
     teintes, liseres = [], []
     for i in range(len(palette)):
-        if i == fond or np.linalg.norm(palette[i] - palette[fond]) < tolerance_fond:
+        if fond is not None and (i == fond or np.linalg.norm(palette[i] - palette[fond]) < tolerance_fond):
             continue
         masque = index == i
         surface = int(masque.sum())

@@ -120,3 +120,28 @@ def test_nombre_de_couleurs_force():
     img.paste((255, 0, 0), (10, 10, 50, 90))
     img.paste((0, 0, 255), (60, 10, 90, 90))
     assert len(couches_couleurs(img, 40, 40, nb_couleurs=1, pas_mm=0.4)) == 1
+
+
+def test_fond_memorise_apres_recadrage():
+    img = Image.new("RGB", (300, 150), "white")
+    img.paste((200, 0, 0), (30, 30, 150, 120))
+    recadree, _ = recadrer_marges(img)
+    assert recadree.info["fond_rgb"] == (255, 255, 255)
+    couches = couches_couleurs(recadree, 24, 18, pas_mm=0.2)
+    assert len(couches) == 1 and couches[0][1].all()  # tout le rectangle rouge est brodé
+
+
+def test_image_unie_sans_marges():
+    """Une image d'une seule couleur sans marge est ambiguë (tout motif ou tout
+    tissu ?) : on ne brode rien et l'interface affiche « aucune zone à broder »."""
+    img = Image.new("RGB", (100, 50), (0, 0, 200))
+    recadree, _ = recadrer_marges(img)
+    assert "fond_rgb" not in recadree.info
+    assert couches_couleurs(img, 20, 10, pas_mm=0.2) == []
+
+
+def test_logo_sans_marges_sur_fond_blanc():
+    img = Image.new("RGB", (100, 50), "white")
+    img.paste((0, 0, 200), (0, 0, 100, 25))  # moitié haute bleue, touche le bord
+    couches = couches_couleurs(img, 20, 10, pas_mm=0.2)
+    assert len(couches) == 1 and 0.45 < couches[0][1].mean() < 0.55

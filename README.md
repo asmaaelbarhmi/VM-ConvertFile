@@ -1,5 +1,48 @@
 # VM-ConvertFile — Image vers DST
 
+Deux applications cohabitent dans ce dépôt :
+
+| | Prototype (racine) | **Outil professionnel** (`backend/` + `frontend/`) |
+|---|---|---|
+| Interface | Streamlit (`app.py`) | Web (HTML/JS) servie par une API FastAPI |
+| Moteur | Remplissage maison | **Ink/Stitch** (vectorisation, satin/tatami, sous-couche, compensation) |
+| Formats de sortie | DST | DST, PES, JEF, EXP… |
+| Déploiement | Streamlit Community Cloud | Docker (serveur ou poste de l'atelier) |
+
+## Outil professionnel : démarrage
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements-backend.txt
+engine/installer_inkstitch.sh          # télécharge Ink/Stitch (version figée) et ses dépendances
+python -m pytest                       # 40 tests
+uvicorn backend.api:app --reload       # puis ouvrir http://localhost:8000
+```
+
+Avec Docker : `docker build -t image-vers-dst . && docker run -p 8000:8000 -v dst_data:/data image-vers-dst`.
+
+### Pipeline
+
+```text
+fichier (PNG/JPG/PDF/SVG…) → retrait des marges, taille proposée, détection des fils
+  → vectorisation par couleur (vtracer) → classement des formes (satin si étroite, tatami si large)
+  → SVG Ink/Stitch avec profil tissu (densité, sous-couche, compensation de tirage)
+  → moteur Ink/Stitch (sans écran) → contrôle (cadre, points, coupes, durée) → aperçu → DST
+```
+
+- `backend/profils/tissus.json` : réglages par support (polo, jersey, polaire, casquette, toile).
+- `backend/profils/machines.json` : cadres et vitesses (SWF K-series…).
+- `engine/wxstub/` : faux module graphique permettant d'exécuter Ink/Stitch sur un serveur.
+- API : `GET /api/sante`, `GET /api/profils`, `POST /api/analyses`, `POST /api/motifs/{id}`,
+  `GET /api/motifs/{id}`, `GET /api/motifs/{id}/motif.dst|pes|jef|exp|svg|apercu.png`.
+
+Licence : Ink/Stitch est sous GPL-3 ; il est lancé comme un programme séparé. À vérifier avant
+toute distribution commerciale de l'outil.
+
+---
+
+## Prototype Streamlit
+
 Mini-application web locale qui prépare une image pour la broderie et exporte un fichier `.DST`.
 
 > ⚠️ Un fichier DST contient des points de broderie, pas l'image. Le résultat n'est **pas garanti** :
