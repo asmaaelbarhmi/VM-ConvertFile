@@ -8,7 +8,7 @@ from PIL import Image
 from backend import config
 from backend.pipeline import vectorisation, formes, svg_inkstitch, moteur
 from src.image_processing import (ouvrir_image, recadrer_marges, taille_proposee, taille_mm,
-                                  couches_couleurs, aplatir)
+                                  couches_couleurs, couches_par_palette, aplatir)
 from src.validation import verifier
 from src.apercu import dessiner
 
@@ -47,14 +47,20 @@ def vignette(image, largeur_px=600):
     return tampon.getvalue()
 
 
-def traiter(image, largeur_mm, tissu, machine, nb_couleurs=None, coupe_mm=8.0, formats=("dst",)):
+def traiter(image, largeur_mm, tissu, machine, nb_couleurs=None, coupe_mm=8.0, formats=("dst",),
+            carte_fils=svg_inkstitch.CARTES_FILS[0], palette=None):
     """Pipeline complet. Renvoie un dict : fichiers (octets par format), svg,
-    rapport, formes, étapes (durées)."""
+    rapport, formes, étapes (durées).
+    `palette` : couleurs [(r, g, b)] issues de l'analyse ; si elle est donnée,
+    la génération reprend exactement les fils montrés à l'utilisateur."""
     etapes = {}
     t = time.time()
     hauteur_mm = round(largeur_mm * image.height / image.width, 1)
     pas = max(PAS_GRILLE_MM, largeur_mm / 1500)
-    couches = couches_couleurs(image, largeur_mm, hauteur_mm, nb_couleurs, pas_mm=pas)
+    if palette:
+        couches = couches_par_palette(image, largeur_mm, hauteur_mm, palette, pas_mm=pas)
+    else:
+        couches = couches_couleurs(image, largeur_mm, hauteur_mm, nb_couleurs, pas_mm=pas)
     if not couches:
         raise ValueError("Aucune zone à broder trouvée dans l'image.")
     etapes["couleurs_s"] = round(time.time() - t, 2)
@@ -67,7 +73,8 @@ def traiter(image, largeur_mm, tissu, machine, nb_couleurs=None, coupe_mm=8.0, f
                          "à cette taille : agrandissez le motif.")
     etapes["vectorisation_s"] = round(time.time() - t, 2)
 
-    svg = svg_inkstitch.construire_svg(analysees, largeur_mm, hauteur_mm, tissu, coupe_mm)
+    svg = svg_inkstitch.construire_svg(analysees, largeur_mm, hauteur_mm, tissu, coupe_mm,
+                                       carte_fils=carte_fils)
 
     t = time.time()
     fichiers = {"dst": moteur.generer(svg, "dst")}
@@ -97,7 +104,8 @@ def traiter(image, largeur_mm, tissu, machine, nb_couleurs=None, coupe_mm=8.0, f
         types = {}
         for f in couche["formes"]:
             types[f["type"]] = types.get(f["type"], 0) + 1
-        resume_formes.append({"fil": n + 1, "hex": "#%02x%02x%02x" % couche["rgb"], "formes": types})
+        resume_formes.append({"fil": n + 1, "hex": "#%02x%02x%02x" % couche["rgb"], "formes": types,
+                              "tuiles": sum(1 for f in couche["formes"] if f.get("tuile"))})
 
     return {"fichiers": fichiers, "svg": svg, "rapport": rapport, "fils": resume_formes,
             "apercu_png": _png(dessiner(motif, 900)), "etapes": etapes,

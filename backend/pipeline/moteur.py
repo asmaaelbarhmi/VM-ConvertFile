@@ -1,9 +1,12 @@
 """Lancement du moteur Ink/Stitch en ligne de commande (sans Inkscape ni écran)."""
 import os
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
 from backend import config
+
+DOSSIER_CONFIG = config.RACINE / "engine" / "config"
 
 FORMATS = {"dst", "pes", "jef", "exp", "vp3", "xxx"}
 
@@ -27,9 +30,18 @@ def verifier_installation():
             "Lancez `engine/installer_inkstitch.sh` ou définissez INKSTITCH_DIR.")
 
 
+def _installer_config():
+    """Copie DEBUG.toml / LOGGING.toml dans le dossier du moteur (journal coupé)."""
+    for nom in ("DEBUG.toml", "LOGGING.toml"):
+        cible = config.DOSSIER_INKSTITCH / nom
+        if not cible.exists() and (DOSSIER_CONFIG / nom).exists():
+            shutil.copy(DOSSIER_CONFIG / nom, cible)
+
+
 def generer(svg_texte, format_="dst", delai_s=None):
     """SVG Ink/Stitch → octets du fichier de broderie."""
     verifier_installation()
+    _installer_config()
     if format_ not in FORMATS:
         raise ValueError(f"Format non pris en charge : {format_}")
     env = dict(os.environ)

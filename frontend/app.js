@@ -16,6 +16,9 @@
     $("formats").textContent = "Formats : " + p.extensions.join(", ").toUpperCase() + " — " + p.taille_max_mo + " Mo max";
     remplir($("tissu"), p.tissus);
     remplir($("machine"), p.machines);
+    var cartes = {};
+    p.cartes_fils.forEach(function (c) { cartes[c] = { nom: c }; });
+    remplir($("carte-fils"), cartes);
     majConseil();
   });
   function remplir(select, dico) {
@@ -99,6 +102,7 @@
     donnees.append("tissu", $("tissu").value);
     donnees.append("machine", $("machine").value);
     donnees.append("coupe_mm", $("coupe").value);
+    donnees.append("carte_fils", $("carte-fils").value);
     var nb = $("nb-couleurs").value || analyse.couleurs.length;
     donnees.append("nb_couleurs", nb);
     var formats = ["dst"];
@@ -145,7 +149,7 @@
     var r = etat.rapport;
     $("resume").textContent = r.points + " points — " + r.largeur_mm + " × " + r.hauteur_mm + " mm — " +
       r.couleurs + " fil(s) — " + r.coupes + " coupes — ≈ " + Math.round(r.minutes) + " min sur " + etat.machine +
-      " — tissu : " + etat.tissu;
+      " — tissu : " + etat.tissu + " — fils : " + etat.carte_fils;
     $("alertes").innerHTML = r.alertes.map(function (a) { return "<li>" + echapper(a) + "</li>"; }).join("");
     $("apercu").src = "/api/motifs/" + analyse.id + "/apercu.png?" + Date.now();
     $("ordre-fils").innerHTML = etat.fils.map(function (f) {

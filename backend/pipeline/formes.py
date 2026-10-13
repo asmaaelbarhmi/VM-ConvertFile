@@ -1,7 +1,11 @@
 """Analyse des formes vectorisées : type de point à utiliser et ordre de broderie."""
 import math
 import shapely
-from shapely.geometry import Polygon, Point
+from shapely.geometry import Polygon, Point, box, MultiPolygon
+
+TUILE_MM = 40.0          # taille des tuiles pour les grandes formes
+SURFACE_TUILAGE_MM2 = 1200.0
+TROUS_TUILAGE = 6
 
 
 def largeur_maxi(poly):
@@ -45,6 +49,38 @@ def classer(poly, tissu):
     return "tatami"
 
 
+def tuiler(poly, taille=TUILE_MM):
+    """Découpe un polygone en tuiles carrées. Le moteur est très lent sur les
+    grandes formes à trous (temps plus que proportionnel à la taille) ; les
+    rangées de tatami étant alignées sur une grille globale, les tuiles
+    voisines se raccordent sans couture visible."""
+    minx, miny, maxx, maxy = poly.bounds
+    tuiles = []
+    x = math.floor(minx / taille) * taille
+    while x < maxx:
+        y = math.floor(miny / taille) * taille
+        while y < maxy:
+            morceau = poly.intersection(box(x, y, x + taille, y + taille))
+            tuiles.extend(g for g in _polygones(morceau) if g.area > 0.5)
+            y += taille
+        x += taille
+    return tuiles
+
+
+def _polygones(geom):
+    """Tous les polygones d'une géométrie (polygone, multi-polygone ou
+    collection mélangeant polygones et segments)."""
+    if isinstance(geom, Polygon):
+        return [geom] if not geom.is_empty else []
+    if hasattr(geom, "geoms"):
+        return [p for g in geom.geoms for p in _polygones(g)]
+    return []
+
+
+def a_tuiler(poly):
+    return poly.area > SURFACE_TUILAGE_MM2 or len(poly.interiors) > TROUS_TUILAGE
+
+
 def ordonner(formes):
     """Ordre de broderie dans une même couleur : du plus proche au plus proche
     (voisin le plus proche à partir du coin haut-gauche) pour limiter les sauts."""
@@ -74,8 +110,11 @@ def analyser(couches_vectorielles, tissu):
             type_ = classer(poly, tissu)
             if type_ == "ignorer":
                 continue
-            formes.append({"poly": poly, "type": type_, "largeur": largeur_maxi(poly),
-                           "angle": angle_principal(poly)})
+            largeur, angle = largeur_maxi(poly), angle_principal(poly)
+            morceaux = tuiler(poly) if type_ == "tatami" and a_tuiler(poly) else [poly]
+            for m in morceaux:
+                formes.append({"poly": m, "type": type_, "largeur": largeur, "angle": angle,
+                               "tuile": len(morceaux) > 1})
         if formes:
             resultat.append({"rgb": rgb, "formes": ordonner(formes)})
     return resultat

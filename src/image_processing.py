@@ -145,6 +145,24 @@ def masque_logo(image, largeur_mm, hauteur_mm, seuil=128, pas_mm=0.4, inverser=F
     return ~masque if inverser else masque
 
 
+def couches_par_palette(image, largeur_mm, hauteur_mm, palette, pas_mm=0.4, tolerance_fond=60):
+    """Découpe l'image selon une palette de fils déjà connue (celle montrée à
+    l'utilisateur lors de l'analyse) : chaque case prend la couleur de fil la
+    plus proche, ou le fond si elle en est plus proche."""
+    colonnes, lignes = grille(largeur_mm, hauteur_mm, pas_mm)
+    img = np.array(aplatir(image).resize((colonnes, lignes), Image.LANCZOS)).astype(float)
+    fond_rgb = image.info.get("fond_rgb")
+    candidats = [np.array(c, dtype=float) for c in palette]
+    if fond_rgb is not None:
+        candidats.append(np.array(fond_rgb, dtype=float))
+    distances = np.stack([np.linalg.norm(img - c, axis=2) for c in candidats], axis=0)
+    index = distances.argmin(axis=0)
+    if fond_rgb is not None:
+        index[distances[-1] < tolerance_fond] = len(palette)  # proche du tissu → fond
+    couches = [(tuple(int(v) for v in c), index == i) for i, c in enumerate(palette)]
+    return [(rgb, m) for rgb, m in couches if m.any()]
+
+
 def _est_lisere(masque, seuil=0.25):
     """Vrai si la zone est un simple liseré : rognée d'une case de chaque
     côté, il n'en reste presque rien (bord flou autour d'une autre couleur)."""

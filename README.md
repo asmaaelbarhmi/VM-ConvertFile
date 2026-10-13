@@ -33,6 +33,10 @@ fichier (PNG/JPG/PDF/SVG…) → retrait des marges, taille proposée, détectio
 - `backend/profils/tissus.json` : réglages par support (polo, jersey, polaire, casquette, toile).
 - `backend/profils/machines.json` : cadres et vitesses (SWF K-series…).
 - `engine/wxstub/` : faux module graphique permettant d'exécuter Ink/Stitch sur un serveur.
+- `engine/config/` : journal du moteur désactivé (le journal de débogage coûtait ~70 % du temps).
+- Vitesse : les grandes formes sont découpées en tuiles de 40 mm (rangées alignées sur une grille
+  globale, donc sans couture) et une carte de fils réelle est imposée (Madeira, Isacord, Gunold)
+  au lieu d'une recherche parmi 75 cartes. Motif de 21 × 28 cm, 100 000 points : ≈ 100 s.
 - API : `GET /api/sante`, `GET /api/profils`, `POST /api/analyses`, `POST /api/motifs/{id}`,
   `GET /api/motifs/{id}`, `GET /api/motifs/{id}/motif.dst|pes|jef|exp|svg|apercu.png`.
 

@@ -48,9 +48,15 @@ def _attributs_satin(forme, tissu):
     return a
 
 
-def construire_svg(couches, largeur_mm, hauteur_mm, tissu, coupe_mm=8.0, angle_base=45):
+CARTES_FILS = ["Madeira Polyneon", "Madeira Rayon", "Isacord Polyester", "Gunold Polyester"]
+
+
+def construire_svg(couches, largeur_mm, hauteur_mm, tissu, coupe_mm=8.0, angle_base=45,
+                   carte_fils=CARTES_FILS[0]):
     """[{'rgb', 'formes'}] → texte SVG prêt pour Ink/Stitch.
-    Une couleur = un calque (<g>) ; l'ordre des calques est l'ordre de broderie."""
+    Une couleur = un calque (<g>) ; l'ordre des calques est l'ordre de broderie.
+    `carte_fils` : carte de fils réelle utilisée pour nommer les couleurs
+    (évite aussi au moteur de comparer 75 cartes, ce qui est très lent)."""
     lignes = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         f'<svg {NS} width="{largeur_mm}mm" height="{hauteur_mm}mm" '
@@ -59,6 +65,7 @@ def construire_svg(couches, largeur_mm, hauteur_mm, tissu, coupe_mm=8.0, angle_b
         '<inkstitch:collapse_len_mm>3.0</inkstitch:collapse_len_mm>',
         '<inkstitch:min_stitch_len_mm>0.3</inkstitch:min_stitch_len_mm>',
         f'<inkstitch:min_jump_stitch_length_mm>{coupe_mm}</inkstitch:min_jump_stitch_length_mm>',
+        f'<inkstitch:thread-palette>"{carte_fils}"</inkstitch:thread-palette>',
         "</metadata>",
     ]
     for n, couche in enumerate(couches):

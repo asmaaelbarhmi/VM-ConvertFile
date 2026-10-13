@@ -2,7 +2,7 @@ import io
 import pytest
 from PIL import Image
 from src.image_processing import (ouvrir_image, masque_logo, couches_couleurs, fond_sombre,
-                                  taille_mm, taille_proposee, recadrer_marges)
+                                  taille_mm, taille_proposee, recadrer_marges, couches_par_palette)
 
 
 def image_en_memoire(fmt, couleur="black", taille=(20, 10)):
@@ -145,3 +145,14 @@ def test_logo_sans_marges_sur_fond_blanc():
     img.paste((0, 0, 200), (0, 0, 100, 25))  # moitié haute bleue, touche le bord
     couches = couches_couleurs(img, 20, 10, pas_mm=0.2)
     assert len(couches) == 1 and 0.45 < couches[0][1].mean() < 0.55
+
+
+def test_couches_par_palette_reprend_les_fils_de_l_analyse():
+    img = Image.new("RGB", (120, 60), "white")
+    img.paste((255, 0, 0), (5, 5, 55, 55))
+    img.paste((0, 0, 255), (65, 5, 115, 55))
+    recadree, _ = recadrer_marges(img)
+    palette = [rgb for rgb, _ in couches_couleurs(recadree, 22, 10, pas_mm=0.2)]
+    couches = couches_par_palette(recadree, 44, 20, palette, pas_mm=0.2)  # grille plus fine
+    assert [rgb for rgb, _ in couches] == palette
+    assert all(0.35 < m.mean() < 0.5 for _, m in couches)  # chaque carré ≈ 45 % de l'image recadrée

@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend import config
 from backend.pipeline import moteur, traitement
+from backend.pipeline.svg_inkstitch import CARTES_FILS
 from src.image_processing import EXTENSIONS
 
 app = FastAPI(title="Image vers DST", version="0.2")
@@ -51,6 +52,7 @@ def profils():
     return {"tissus": {k: {"nom": v["nom"], "conseil": v["conseil"]} for k, v in tissus.items()},
             "machines": {k: {"nom": v["nom"], "cadre_l_mm": v["cadre_l_mm"], "cadre_h_mm": v["cadre_h_mm"]}
                          for k, v in machines.items()},
+            "cartes_fils": CARTES_FILS,
             "extensions": EXTENSIONS, "taille_max_mo": config.TAILLE_MAX_OCTETS // (1024 * 1024)}
 
 
@@ -78,7 +80,7 @@ async def analyser(fichier: UploadFile = File(...), nb_couleurs: int | None = Fo
     return {"id": id_, **analyse}
 
 
-def _generer(id_, largeur_mm, tissu_cle, machine_cle, nb_couleurs, coupe_mm, formats):
+def _generer(id_, largeur_mm, tissu_cle, machine_cle, nb_couleurs, coupe_mm, formats, carte_fils):
     d = _dossier(id_)
     try:
         tissus, machines = traitement.charger_profils()
@@ -88,8 +90,11 @@ def _generer(id_, largeur_mm, tissu_cle, machine_cle, nb_couleurs, coupe_mm, for
         analyse = json.loads((d / "analyse.json").read_text(encoding="utf-8"))
         if analyse.get("fond_rgb"):
             image.info["fond_rgb"] = tuple(analyse["fond_rgb"])
+        couleurs = [tuple(int(c["hex"][i:i + 2], 16) for i in (1, 3, 5)) for c in analyse["couleurs"]]
+        # Sans choix explicite d'un autre nombre de fils, on reprend la palette montrée à l'analyse
+        palette = couleurs if nb_couleurs in (None, len(couleurs)) else None
         resultat = traitement.traiter(image, largeur_mm, tissus[tissu_cle], machines[machine_cle],
-                                      nb_couleurs, coupe_mm, formats)
+                                      nb_couleurs, coupe_mm, formats, carte_fils, palette)
         for f, octets in resultat["fichiers"].items():
             (d / f"motif.{f}").write_bytes(octets)
         (d / "motif.svg").write_text(resultat["svg"], encoding="utf-8")
@@ -97,7 +102,8 @@ def _generer(id_, largeur_mm, tissu_cle, machine_cle, nb_couleurs, coupe_mm, for
         etat = {"etat": "termine", "rapport": resultat["rapport"], "fils": resultat["fils"],
                 "etapes": resultat["etapes"], "largeur_mm": resultat["largeur_mm"],
                 "hauteur_mm": resultat["hauteur_mm"], "formats": list(resultat["fichiers"]),
-                "tissu": tissus[tissu_cle]["nom"], "machine": machines[machine_cle]["nom"]}
+                "tissu": tissus[tissu_cle]["nom"], "machine": machines[machine_cle]["nom"],
+                "carte_fils": carte_fils}
     except moteur.MoteurIndisponible as e:
         etat = {"etat": "erreur", "erreur": str(e), "code": "moteur_absent"}
     except (moteur.ErreurMoteur, ValueError) as e:
@@ -113,13 +119,15 @@ def _generer(id_, largeur_mm, tissu_cle, machine_cle, nb_couleurs, coupe_mm, for
 def generer(id_: str, taches: BackgroundTasks, largeur_mm: float = Form(...),
             tissu: str = Form("polo_pique"), machine: str = Form("swf_k_450x300"),
             nb_couleurs: int | None = Form(None), coupe_mm: float = Form(8.0),
-            formats: str = Form("dst")):
+            formats: str = Form("dst"), carte_fils: str = Form(CARTES_FILS[0])):
     """Étape 2 : lance la génération en arrière-plan."""
     if id_ not in _etats:
         raise HTTPException(404, "Analyse inconnue ou expirée.")
     tissus, machines = traitement.charger_profils()
     if tissu not in tissus or machine not in machines:
         raise HTTPException(422, "Profil tissu ou machine inconnu.")
+    if carte_fils not in CARTES_FILS:
+        raise HTTPException(422, "Carte de fils inconnue.")
     if not 5 <= largeur_mm <= config.TAILLE_MAX_MM:
         raise HTTPException(422, f"Largeur entre 5 et {config.TAILLE_MAX_MM:.0f} mm.")
     liste_formats = [f for f in formats.split(",") if f in moteur.FORMATS] or ["dst"]
@@ -127,7 +135,8 @@ def generer(id_: str, taches: BackgroundTasks, largeur_mm: float = Form(...),
         liste_formats.insert(0, "dst")
     with _verrou:
         _etats[id_].update({"etat": "en_cours"})
-    taches.add_task(_generer, id_, largeur_mm, tissu, machine, nb_couleurs or None, coupe_mm, liste_formats)
+    taches.add_task(_generer, id_, largeur_mm, tissu, machine, nb_couleurs or None, coupe_mm, liste_formats,
+                    carte_fils)
     return {"id": id_, "etat": "en_cours"}
 
 

@@ -111,3 +111,32 @@ def test_api_refuse_extension():
     from backend.api import app
     r = TestClient(app).post("/api/analyses", files={"fichier": ("x.exe", b"abc", "application/octet-stream")})
     assert r.status_code == 415
+
+
+def test_tuilage_des_grandes_formes():
+    grande = Polygon([(0, 0), (100, 0), (100, 90), (0, 90)])
+    assert formes.a_tuiler(grande)
+    tuiles = formes.tuiler(grande, 40)
+    assert len(tuiles) == 9 and abs(sum(t.area for t in tuiles) - grande.area) < 0.01
+    assert not formes.a_tuiler(Polygon([(0, 0), (30, 0), (30, 30), (0, 30)]))
+    couches = formes.analyser([((0, 0, 0), [grande])], tissu())
+    assert len(couches[0]["formes"]) == 9 and all(f["tuile"] for f in couches[0]["formes"])
+    assert len({f["angle"] for f in couches[0]["formes"]}) == 1  # même angle : rangées alignées
+
+
+def test_tuilage_garde_toute_la_surface_des_formes_irregulieres():
+    """Une forme en étoile : l'intersection avec certaines tuiles donne un mélange
+    de polygones et de segments ; rien ne doit être perdu."""
+    import math
+    pts = []
+    for i in range(16):
+        r = 60 if i % 2 == 0 else 20
+        pts.append((50 + r * math.cos(i * math.pi / 8), 50 + r * math.sin(i * math.pi / 8)))
+    etoile = Polygon(pts).buffer(0)
+    tuiles = formes.tuiler(etoile, 40)
+    assert abs(sum(t.area for t in tuiles) - etoile.area) < 0.5
+
+
+def test_carte_de_fils_dans_le_svg():
+    svg = svg_inkstitch.construire_svg([], 10, 10, tissu(), carte_fils="Isacord Polyester")
+    assert '<inkstitch:thread-palette>"Isacord Polyester"</inkstitch:thread-palette>' in svg
