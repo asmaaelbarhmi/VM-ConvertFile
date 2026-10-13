@@ -8,14 +8,29 @@ EXTENSIONS = ["png", "jpg", "jpeg", "webp", "bmp", "tif", "tiff", "gif", "pdf", 
 DPI_VECTORIEL = 300  # finesse de conversion des PDF/SVG en pixels
 
 
+import re
+
+UNITES_MM = {"mm": 1.0, "cm": 10.0, "in": 25.4, "pt": 25.4 / 72, "pc": 25.4 / 6, "px": 25.4 / 96, "": 25.4 / 96}
+
+
 def _rendre_pdf(donnees):
     import pypdfium2
     doc = pypdfium2.PdfDocument(donnees)
     if len(doc) == 0:
         raise ValueError("Le PDF ne contient aucune page.")
-    image = doc[0].render(scale=DPI_VECTORIEL / 72).to_pil().convert("RGB")
+    page = doc[0]
+    image = page.render(scale=DPI_VECTORIEL / 72).to_pil().convert("RGB")
     image.format = "PDF"
+    l_pt, h_pt = page.get_size()
+    image.info["taille_mm"] = (l_pt * 25.4 / 72, h_pt * 25.4 / 72)
     return image
+
+
+def _longueur_svg(texte, attribut):
+    m = re.search(attribut + r'\s*=\s*["\']\s*([0-9.]+)\s*([a-z%]*)', texte)
+    if not m or m.group(2) == "%":
+        return None
+    return float(m.group(1)) * UNITES_MM.get(m.group(2), 25.4 / 96)
 
 
 def _rendre_svg(donnees):
@@ -24,6 +39,10 @@ def _rendre_svg(donnees):
     image = Image.open(io.BytesIO(png))
     image.load()
     image.format = "SVG"
+    entete = donnees[:3000].decode("utf-8", "ignore")
+    l, h = _longueur_svg(entete, "width"), _longueur_svg(entete, "height")
+    if l and h:
+        image.info["taille_mm"] = (l, h)
     return image
 
 
@@ -49,6 +68,50 @@ def ouvrir_image(fichier, nom=None):
         raise ValueError(f"Format non pris en charge : {image.format}. "
                          "Formats acceptés : PNG, JPG, WebP, BMP, TIFF, GIF, PDF, SVG.")
     return image
+
+
+def taille_mm(image):
+    """Taille réelle (largeur, hauteur) en mm si le fichier la connaît
+    (page PDF, attributs SVG, résolution DPI d'une image), sinon None."""
+    if "taille_mm" in image.info:
+        return image.info["taille_mm"]
+    dpi = image.info.get("dpi")
+    if dpi and dpi[0] > 1 and dpi[1] > 1:
+        return (image.width * 25.4 / dpi[0], image.height * 25.4 / dpi[1])
+    return None
+
+
+def recadrer_marges(image, tolerance=30):
+    """Enlève les marges unies (blanches, transparentes ou de la couleur des
+    bords) autour du motif. Renvoie (image recadrée, boîte (x1, y1, x2, y2))."""
+    rgb = aplatir(image)
+    tableau = np.array(rgb).astype(int)
+    bords = np.concatenate([tableau[0], tableau[-1], tableau[:, 0], tableau[:, -1]])
+    fond = np.median(bords, axis=0)
+    difference = np.abs(tableau - fond).sum(axis=2) > tolerance
+    ys, xs = np.nonzero(difference)
+    if len(xs) == 0:
+        return image, (0, 0, image.width, image.height)
+    boite = (int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1)
+    recadree = image.crop(boite)
+    recadree.format = image.format
+    recadree.info = dict(image.info)
+    if "taille_mm" in image.info or image.info.get("dpi"):
+        l, h = taille_mm(image)
+        recadree.info["taille_mm"] = (l * recadree.width / image.width, h * recadree.height / image.height)
+    return recadree, boite
+
+
+def taille_proposee(image, defaut_mm=100.0, maxi_mm=400.0):
+    """Largeur et hauteur à proposer : la taille réelle si connue (plafonnée),
+    sinon `defaut_mm` de largeur en gardant les proportions."""
+    reelle = taille_mm(image)
+    if reelle:
+        l, h = reelle
+    else:
+        l, h = defaut_mm, defaut_mm * image.height / image.width
+    facteur = min(1.0, maxi_mm / max(l, h))
+    return round(l * facteur, 1), round(h * facteur, 1)
 
 
 def aplatir(image):

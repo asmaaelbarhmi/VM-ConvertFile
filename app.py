@@ -1,83 +1,93 @@
 import streamlit as st
-from src.image_processing import (ouvrir_image, masque_logo, couches_couleurs,
-                                  fond_sombre, EXTENSIONS)
-from src.digitizing import remplissage, motif_couches
+from src.image_processing import (ouvrir_image, masque_logo, couches_couleurs, fond_sombre,
+                                  recadrer_marges, taille_proposee, taille_mm, EXTENSIONS)
+from src.digitizing import motif_couches
 from src.dst_export import exporter_dst
 from src.validation import verifier, PROFIL_DEFAUT
 from src.apercu import dessiner
 
 st.set_page_config(page_title="Image vers DST", page_icon="🧵", layout="wide")
 st.title("Conversion d'image vers DST")
-st.warning("Un fichier DST n'est pas « prêt à broder » : vérifiez l'aperçu des points, "
-           "simulez-le sur la machine et faites un essai sur une chute de tissu.")
 
-# --- Profil machine (barre latérale) ---
-st.sidebar.header("Machine")
+# --- Profil machine (barre latérale, replié par défaut) ---
 profil = dict(PROFIL_DEFAUT)
-profil["cadre_l_mm"] = st.sidebar.number_input("Largeur du cadre (mm)", 50, 1200, profil["cadre_l_mm"])
-profil["cadre_h_mm"] = st.sidebar.number_input("Hauteur du cadre (mm)", 50, 1200, profil["cadre_h_mm"])
-profil["vitesse_ppm"] = st.sidebar.number_input("Vitesse (points/min)", 300, 1500, profil["vitesse_ppm"])
-st.sidebar.caption("Valeurs par défaut prudentes pour une SWF K-series : "
-                   "mettez la taille réelle du cadre monté.")
+with st.sidebar.expander("Machine", expanded=False):
+    profil["cadre_l_mm"] = st.number_input("Largeur du cadre (mm)", 50, 1200, profil["cadre_l_mm"])
+    profil["cadre_h_mm"] = st.number_input("Hauteur du cadre (mm)", 50, 1200, profil["cadre_h_mm"])
+    profil["vitesse_ppm"] = st.number_input("Vitesse (points/min)", 300, 1500, profil["vitesse_ppm"])
+    st.caption("Valeurs prudentes pour une SWF K-series : mettez la taille réelle du cadre monté.")
 
-fichier = st.file_uploader("Importer une image, un PDF ou un SVG", type=EXTENSIONS)
+fichier = st.file_uploader("1. Importer une image, un PDF ou un SVG", type=EXTENSIONS)
 if not fichier:
+    st.info("Formats acceptés : PNG, JPG, WebP, BMP, TIFF, GIF, PDF, SVG. "
+            "La taille est proposée automatiquement d'après le fichier.")
     st.stop()
 
 try:
-    image = ouvrir_image(fichier, fichier.name)
+    originale = ouvrir_image(fichier, fichier.name)
 except ValueError as e:
     st.error(str(e))
     st.stop()
 
-col_image, col_params = st.columns(2)
+image, boite = recadrer_marges(originale)
+largeur_defaut, hauteur_defaut = taille_proposee(image)
+origine = ("taille lue dans le fichier" if taille_mm(image)
+           else "taille par défaut, le fichier n'indique pas de dimensions")
+
+# Les valeurs par défaut sont recalculées quand on change de fichier.
+cle = fichier.name + str(fichier.size)
+if st.session_state.get("fichier_courant") != cle:
+    st.session_state["fichier_courant"] = cle
+    st.session_state["largeur_mm"] = largeur_defaut
+
+col_image, col_params = st.columns([1, 1])
 with col_image:
-    st.image(image, caption=f"{image.format} — {image.width} × {image.height} px")
+    st.image(image, caption=f"{image.format} — {image.width} × {image.height} px, marges retirées")
 
 with col_params:
-    mode = st.radio("Type d'image", ["Logo 1 couleur", "Logo plusieurs couleurs", "Photo (expérimental)"])
+    st.markdown("**2. Taille de la broderie**")
+    largeur = st.number_input("Largeur (mm)", 10.0, 1200.0, key="largeur_mm", step=5.0)
+    hauteur = round(largeur * image.height / image.width, 1)
+    st.write(f"Hauteur : **{hauteur} mm** (proportions conservées) — "
+             f"proposition : {largeur_defaut} × {hauteur_defaut} mm, {origine}")
+
+    st.markdown("**3. Type de motif**")
+    mode = st.radio("Type de motif", ["Logo plusieurs couleurs", "Logo 1 couleur", "Photo (expérimental)"],
+                    label_visibility="collapsed", horizontal=True)
     if mode.startswith("Photo"):
         st.info("Le mode photo n'est pas encore disponible (phase 3). "
                 "Essayez « Logo plusieurs couleurs » sur une image très simplifiée.")
         st.stop()
-    largeur = st.number_input("Largeur finale (mm)", 10.0, 1200.0, 80.0)
-    ratio = image.height / image.width
-    hauteur = st.number_input("Hauteur finale (mm)", 10.0, 1200.0,
-                              min(1200.0, max(10.0, round(largeur * ratio, 1))))
-    pas = st.slider("Écart entre les lignes (mm)", 0.3, 1.0, 0.4, 0.05)
-    point_max = st.slider("Longueur maximale d'un point (mm)", 1.0, 7.0, 3.0, 0.5)
-    coupe = st.slider("Couper le fil pour un déplacement de plus de (mm)", 3.0, 30.0, 8.0, 1.0)
+
+    with st.expander("Réglages avancés", expanded=False):
+        pas = st.slider("Écart entre les lignes (mm)", 0.3, 1.0, 0.4, 0.05)
+        point_max = st.slider("Longueur maximale d'un point (mm)", 1.0, 7.0, 3.0, 0.5)
+        coupe = st.slider("Couper le fil pour un déplacement de plus de (mm)", 3.0, 30.0, 8.0, 1.0)
+        if mode == "Logo 1 couleur":
+            seuil = st.slider("Seuil noir/blanc", 0, 255, 128)
+            sombre = fond_sombre(image)
+            inverser = st.checkbox("Inverser (motif clair sur fond sombre)", value=sombre)
+        else:
+            nb = st.slider("Nombre de couleurs de fil", 2, 8, 4)
 
     if mode == "Logo 1 couleur":
-        seuil = st.slider("Seuil noir/blanc", 0, 255, 128)
-        sombre = fond_sombre(image)
-        inverser = st.checkbox("Inverser (le motif est clair sur fond sombre)", value=sombre)
-        if sombre:
-            st.caption("Fond sombre détecté : l'inversion a été cochée automatiquement.")
-        masque = masque_logo(image, largeur, hauteur, seuil, pas, inverser)
-        couches = [((0, 0, 0), masque)]
+        couches = [((0, 0, 0), masque_logo(image, largeur, hauteur, seuil, pas, inverser))]
     else:
-        nb = st.slider("Nombre de couleurs de fil", 2, 8, 4)
         couches = couches_couleurs(image, largeur, hauteur, nb, pas)
-        st.caption("La couleur la plus présente sur les bords est considérée comme le tissu "
-                   "et n'est pas brodée.")
 
-# --- Diagnostic avant génération ---
 if not couches:
     st.error("Aucune zone à broder trouvée.")
     st.stop()
 surface = couches[0][1].size
 couverture = sum(c[1].sum() for c in couches) / surface
-st.subheader("Diagnostic")
-st.write(f"Surface brodée : **{couverture:.0%}** de la zone — {len(couches)} couleur(s)")
-if mode != "Logo 1 couleur":
-    for n, (rgb, m) in enumerate(couches):
-        hexa = "#%02x%02x%02x" % rgb
-        st.markdown(f'<span style="display:inline-block;width:1em;height:1em;background:{hexa};'
-                    f'border:1px solid #888"></span> Fil {n + 1} : {hexa} — {m.sum() / surface:.0%}',
-                    unsafe_allow_html=True)
 
-if st.button("Générer le DST", type="primary"):
+pastilles = " ".join(
+    f'<span style="display:inline-block;width:1em;height:1em;background:#{r:02x}{g:02x}{b:02x};'
+    f'border:1px solid #888;vertical-align:middle"></span>' for (r, g, b), _ in couches)
+st.markdown(f"{len(couches)} couleur(s) de fil {pastilles} — {couverture:.0%} de la surface brodée",
+            unsafe_allow_html=True)
+
+if st.button("4. Générer le DST", type="primary"):
     try:
         motif = motif_couches(couches, pas, point_max, coupe)
         donnees, relu = exporter_dst(motif)
@@ -95,3 +105,5 @@ if st.button("Générer le DST", type="primary"):
         st.markdown("**Ordre des fils pour l'opérateur :** " +
                     " → ".join("#%02x%02x%02x" % rgb for rgb, _ in couches))
     st.download_button("Télécharger le .DST", donnees, "motif.dst", "application/octet-stream")
+    st.caption("Vérifiez l'aperçu, simulez sur la machine et faites un essai sur une chute de tissu "
+               "avant la production.")

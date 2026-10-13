@@ -9,7 +9,7 @@ Mini-application web locale qui prépare une image pour la broderie et exporte u
 ## Fonctionnalités (prototype)
 
 - Import PNG, JPG, WebP, BMP, TIFF, GIF, **PDF** (1re page) et **SVG** (10 Mo max).
-- Dimensions finales en millimètres ; profil machine (taille du cadre, vitesse) dans la barre latérale.
+- Marges retirées automatiquement et **taille proposée d'après le fichier** (page PDF, largeur/hauteur SVG, résolution DPI), modifiable ensuite ; la hauteur suit les proportions. Profil machine dans la barre latérale.
 - Mode **logo 1 couleur** : seuil noir/blanc, détection automatique d'un fond sombre.
 - Mode **logo plusieurs couleurs** : réduction à N fils, le fond (couleur des bords) n'est pas brodé,
   un arrêt de changement de fil entre chaque couleur, ordre des fils affiché pour l'opérateur.

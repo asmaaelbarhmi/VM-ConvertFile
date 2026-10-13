@@ -1,7 +1,8 @@
 import io
 import pytest
 from PIL import Image
-from src.image_processing import ouvrir_image, masque_logo, couches_couleurs, fond_sombre
+from src.image_processing import (ouvrir_image, masque_logo, couches_couleurs, fond_sombre,
+                                  taille_mm, taille_proposee, recadrer_marges)
 
 
 def image_en_memoire(fmt, couleur="black", taille=(20, 10)):
@@ -59,3 +60,46 @@ def test_couches_couleurs_sans_fond():
     assert len(couches) == 2
     assert couches[0][1].sum() > couches[1][1].sum()  # la plus grande zone d'abord
     assert couches[0][0][0] > 200  # rouge
+
+
+def test_taille_pdf():
+    tampon = io.BytesIO()
+    Image.new("RGB", (100, 50), "black").save(tampon, "PDF", resolution=100)  # 25,4 × 12,7 mm
+    tampon.seek(0)
+    l, h = taille_mm(ouvrir_image(tampon, "a.pdf"))
+    assert abs(l - 25.4) < 0.5 and abs(h - 12.7) < 0.5
+
+
+def test_taille_svg_en_mm():
+    svg = b'<svg xmlns="http://www.w3.org/2000/svg" width="80mm" height="4cm"><rect width="10" height="10"/></svg>'
+    assert taille_mm(ouvrir_image(io.BytesIO(svg), "a.svg")) == (80.0, 40.0)
+
+
+def test_taille_png_par_dpi():
+    tampon = io.BytesIO()
+    Image.new("RGB", (300, 150), "black").save(tampon, "PNG", dpi=(300, 300))
+    tampon.seek(0)
+    l, h = taille_mm(ouvrir_image(tampon))
+    assert abs(l - 25.4) < 0.1 and abs(h - 12.7) < 0.1
+
+
+def test_taille_inconnue_proposition_par_defaut():
+    img = Image.new("RGB", (200, 100), "black")
+    assert taille_mm(img) is None
+    assert taille_proposee(img) == (100.0, 50.0)
+
+
+def test_taille_proposee_plafonnee():
+    img = Image.new("RGB", (100, 100), "black")
+    img.info["taille_mm"] = (800.0, 800.0)
+    assert taille_proposee(img, maxi_mm=400) == (400.0, 400.0)
+
+
+def test_recadrer_marges():
+    img = Image.new("RGB", (100, 100), "white")
+    img.paste("black", (20, 30, 60, 70))
+    img.info["dpi"] = (254, 254)  # 10 mm pour 100 px
+    recadree, boite = recadrer_marges(img)
+    assert boite == (20, 30, 60, 70) and recadree.size == (40, 40)
+    l, h = taille_mm(recadree)
+    assert abs(l - 4.0) < 0.01 and abs(h - 4.0) < 0.01
