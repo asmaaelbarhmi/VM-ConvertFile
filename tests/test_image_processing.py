@@ -56,7 +56,7 @@ def test_couches_couleurs_sans_fond():
     img = Image.new("RGB", (100, 100), "white")
     img.paste((255, 0, 0), (10, 10, 60, 90))
     img.paste((0, 0, 255), (70, 10, 90, 30))
-    couches = couches_couleurs(img, 40, 40, nb_couleurs=2, pas_mm=0.4)
+    couches = couches_couleurs(img, 40, 40, pas_mm=0.4)  # détection automatique
     assert len(couches) == 2
     assert couches[0][1].sum() > couches[1][1].sum()  # la plus grande zone d'abord
     assert couches[0][0][0] > 200  # rouge
@@ -103,3 +103,20 @@ def test_recadrer_marges():
     assert boite == (20, 30, 60, 70) and recadree.size == (40, 40)
     l, h = taille_mm(recadree)
     assert abs(l - 4.0) < 0.01 and abs(h - 4.0) < 0.01
+
+
+def test_logo_noir_flou_donne_une_seule_couleur():
+    from PIL import ImageFilter
+    img = Image.new("RGB", (200, 100), "white")
+    img.paste("black", (20, 20, 180, 80))
+    img = img.filter(ImageFilter.GaussianBlur(3))  # bords gris comme un vrai logo
+    couches = couches_couleurs(img, 40, 20, pas_mm=0.4)
+    assert len(couches) == 1
+    assert max(couches[0][0]) < 60  # un fil noir
+
+
+def test_nombre_de_couleurs_force():
+    img = Image.new("RGB", (100, 100), "white")
+    img.paste((255, 0, 0), (10, 10, 50, 90))
+    img.paste((0, 0, 255), (60, 10, 90, 90))
+    assert len(couches_couleurs(img, 40, 40, nb_couleurs=1, pas_mm=0.4)) == 1

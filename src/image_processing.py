@@ -142,23 +142,73 @@ def masque_logo(image, largeur_mm, hauteur_mm, seuil=128, pas_mm=0.4, inverser=F
     return ~masque if inverser else masque
 
 
-def couches_couleurs(image, largeur_mm, hauteur_mm, nb_couleurs=4, pas_mm=0.4, tolerance_fond=60):
-    """Réduit l'image à `nb_couleurs` couleurs et renvoie une liste de
-    (rgb, masque) sans le fond, de la plus grande zone à la plus petite.
-    Les teintes proches du fond (distance < tolerance_fond) sont ignorées."""
+def _est_lisere(masque, seuil=0.25):
+    """Vrai si la zone est un simple liseré : rognée d'une case de chaque
+    côté, il n'en reste presque rien (bord flou autour d'une autre couleur)."""
+    if masque.sum() == 0:
+        return True
+    m = np.pad(masque, 1)
+    coeur = m[1:-1, 1:-1] & m[:-2, 1:-1] & m[2:, 1:-1] & m[1:-1, :-2] & m[1:-1, 2:]
+    return coeur.sum() / masque.sum() < seuil
+
+
+def couches_couleurs(image, largeur_mm, hauteur_mm, nb_couleurs=None, pas_mm=0.4,
+                     tolerance_fond=60, fusion=80, surface_mini=0.01):
+    """Découpe l'image en couches de couleur (rgb, masque), sans le fond,
+    de la plus grande zone à la plus petite.
+
+    - nb_couleurs=None : nombre détecté automatiquement. Les teintes dont la
+      distance est inférieure à `fusion` sont considérées comme le même fil
+      (bords flous, dégradés légers) et les couleurs qui couvrent moins de
+      `surface_mini` du motif sont rattachées à la couleur la plus proche.
+    - Une teinte qui ne forme qu'un liseré fin (bord flou) n'est jamais un fil.
+    - nb_couleurs=N : au plus N fils, les plus présents."""
     colonnes, lignes = grille(largeur_mm, hauteur_mm, pas_mm)
     img = aplatir(image).resize((colonnes, lignes), Image.LANCZOS)
-    quant = img.quantize(colors=nb_couleurs + 4, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+    quant = img.quantize(colors=16, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
     index = np.array(quant)
-    palette = np.array(quant.getpalette()[: 3 * (index.max() + 1)]).reshape(-1, 3)
+    palette = np.array(quant.getpalette()[: 3 * (index.max() + 1)]).reshape(-1, 3).astype(float)
     bords = np.concatenate([index[0], index[-1], index[:, 0], index[:, -1]])
     fond = np.bincount(bords).argmax()  # couleur la plus présente sur les bords = tissu
-    couches = []
+
+    # 1. Teintes du motif (hors fond), avec leur surface
+    teintes, liseres = [], []
     for i in range(len(palette)):
-        distance = np.linalg.norm(palette[i].astype(float) - palette[fond])
-        masque = index == i
-        if i == fond or distance < tolerance_fond or masque.sum() == 0:
+        if i == fond or np.linalg.norm(palette[i] - palette[fond]) < tolerance_fond:
             continue
-        couches.append((tuple(int(v) for v in palette[i]), masque))
-    couches.sort(key=lambda c: -c[1].sum())
-    return couches[:nb_couleurs]
+        masque = index == i
+        surface = int(masque.sum())
+        if surface == 0:
+            continue
+        (liseres if _est_lisere(masque) else teintes).append([palette[i].copy(), [i], surface])
+    teintes.sort(key=lambda t: -t[2])
+    if not teintes:  # motif fait uniquement de traits fins : on garde tout
+        teintes, liseres = liseres, []
+
+    # 2. Fusion des teintes proches (en partant des plus présentes)
+    groupes = []
+    for couleur, idx, surface in teintes:
+        for g in groupes:
+            if np.linalg.norm(g[0] - couleur) < fusion:
+                g[0] = (g[0] * g[2] + couleur * surface) / (g[2] + surface)  # moyenne pondérée
+                g[1] += idx
+                g[2] += surface
+                break
+        else:
+            groupes.append([couleur, list(idx), surface])
+
+    # 3. Les toutes petites couleurs rejoignent la plus proche ; limite à N
+    total = sum(g[2] for g in groupes) or 1
+    groupes.sort(key=lambda g: -g[2])
+    limite = nb_couleurs or len(groupes)
+    gardes, restes = groupes[:limite], groupes[limite:] + liseres
+    for g in list(gardes):
+        if g is not gardes[0] and g[2] / total < surface_mini:
+            gardes.remove(g)
+            restes.append(g)
+    for g in restes:
+        proche = min(gardes, key=lambda k: np.linalg.norm(k[0] - g[0]))
+        proche[1] += g[1]
+        proche[2] += g[2]
+
+    return [(tuple(int(round(v)) for v in g[0]), np.isin(index, g[1])) for g in gardes]

@@ -68,7 +68,8 @@ with col_params:
             sombre = fond_sombre(image)
             inverser = st.checkbox("Inverser (motif clair sur fond sombre)", value=sombre)
         else:
-            nb = st.slider("Nombre de couleurs de fil", 2, 8, 4)
+            choix = st.selectbox("Nombre de couleurs de fil", ["Automatique"] + list(range(1, 9)))
+            nb = None if choix == "Automatique" else int(choix)
 
     if mode == "Logo 1 couleur":
         couches = [((0, 0, 0), masque_logo(image, largeur, hauteur, seuil, pas, inverser))]
@@ -86,6 +87,9 @@ pastilles = " ".join(
     f'border:1px solid #888;vertical-align:middle"></span>' for (r, g, b), _ in couches)
 st.markdown(f"{len(couches)} couleur(s) de fil {pastilles} — {couverture:.0%} de la surface brodée",
             unsafe_allow_html=True)
+if mode != "Logo 1 couleur":
+    st.caption("Couleurs détectées automatiquement (les teintes proches sont fusionnées). "
+               "Pour forcer un nombre : Réglages avancés → Nombre de couleurs de fil.")
 
 if st.button("4. Générer le DST", type="primary"):
     try:
