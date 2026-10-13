@@ -37,6 +37,17 @@ def test_classement_des_formes():
     assert abs(formes.angle_principal(Polygon([(0, 0), (40, 0), (40, 3), (0, 3)]))) < 1
 
 
+def test_grande_forme_a_trous_reste_tatami():
+    """Une grande plaque percée de trous a un périmètre énorme mais reste large :
+    elle doit être remplie en tatami, pas traitée comme un satin."""
+    plaque = Polygon([(0, 0), (80, 0), (80, 60), (0, 60)])
+    for y in range(3, 58, 3):  # 19 fentes fines dans la moitié gauche
+        plaque = plaque.difference(Polygon([(5, y), (35, y), (35, y + 0.6), (5, y + 0.6)]))
+    assert formes.largeur_moyenne(plaque) < 7      # trompeur : périmètre gonflé par les fentes
+    assert formes.largeur_maxi(plaque) > 30        # la moitié droite est une vraie plaque
+    assert formes.classer(plaque, tissu()) == "tatami"
+
+
 def test_svg_inkstitch():
     t = tissu()
     couches = [{"rgb": (200, 0, 0), "formes": [

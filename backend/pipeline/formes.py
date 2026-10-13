@@ -1,11 +1,19 @@
 """Analyse des formes vectorisées : type de point à utiliser et ordre de broderie."""
 import math
-from shapely.geometry import Polygon
+import shapely
+from shapely.geometry import Polygon, Point
+
+
+def largeur_maxi(poly):
+    """Largeur maximale d'une forme : diamètre du plus grand cercle que l'on
+    peut y inscrire. Insensible aux trous et aux contours découpés."""
+    if poly.is_empty or poly.area == 0:
+        return 0.0
+    return 2 * shapely.maximum_inscribed_circle(poly, 0.05).length
 
 
 def largeur_moyenne(poly):
-    """Largeur approximative d'une forme : 2 × surface / périmètre
-    (exacte pour une bande, bonne estimation pour un trait ou une lettre)."""
+    """Largeur moyenne : 2 × surface / périmètre (exacte pour une bande)."""
     if poly.length == 0:
         return 0.0
     return 2 * poly.area / poly.length
@@ -29,7 +37,7 @@ def classer(poly, tissu):
     - 'tatami'   : large → remplissage"""
     if poly.area < tissu["surface_mini_mm2"]:
         return "ignorer"
-    largeur = largeur_moyenne(poly)
+    largeur = largeur_maxi(poly)
     if largeur < tissu["largeur_mini_mm"]:
         return "ignorer"
     if largeur <= tissu["satin_largeur_max_mm"]:
@@ -53,7 +61,6 @@ def ordonner(formes):
 
 
 def _point(xy):
-    from shapely.geometry import Point
     return Point(xy)
 
 
@@ -67,7 +74,7 @@ def analyser(couches_vectorielles, tissu):
             type_ = classer(poly, tissu)
             if type_ == "ignorer":
                 continue
-            formes.append({"poly": poly, "type": type_, "largeur": largeur_moyenne(poly),
+            formes.append({"poly": poly, "type": type_, "largeur": largeur_maxi(poly),
                            "angle": angle_principal(poly)})
         if formes:
             resultat.append({"rgb": rgb, "formes": ordonner(formes)})
