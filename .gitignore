@@ -1,8 +1,9 @@
-.venv/
-__pycache__/
+node_modules/
+dist/
+*.tsbuildinfo
+.vite/
 *.dst
-.pytest_cache/
-
-# Moteur et données générées
-engine/inkstitch/
-data/
+*.pes
+*.jef
+*.exp
+.DS_Store

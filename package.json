@@ -1,0 +1,19 @@
+{
+  "name": "vm-convertfile",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Outil de conversion d'images en fichiers de broderie (DST, PES, JEF, EXP) — moteur TypeScript",
+  "workspaces": ["packages/*", "web"],
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -b packages/stitch-core packages/image",
+    "build": "tsc -b packages/stitch-core packages/image && npm run -w web build",
+    "dev": "npm run -w web dev"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^6.0.0",
+    "vitest": "^5.0.0"
+  },
+  "engines": { "node": ">=20" }
+}

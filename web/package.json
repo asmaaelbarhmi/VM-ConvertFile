@@ -1,0 +1,9 @@
+{
+  "name": "web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": { "dev": "vite", "build": "vite build", "preview": "vite preview" },
+  "dependencies": { "@atelier/image": "0.1.0", "@atelier/stitch-core": "0.1.0" },
+  "devDependencies": { "vite": "^7.0.0" }
+}

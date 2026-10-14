@@ -1,3 +1,0 @@
-# Configuration d'Ink/Stitch pour un usage serveur (copiée dans engine/inkstitch/ par le pipeline).
-[LOGGING]
-log_config_file = "LOGGING.toml"
