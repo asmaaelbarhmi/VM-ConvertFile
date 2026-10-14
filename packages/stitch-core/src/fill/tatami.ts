@@ -11,6 +11,8 @@ import { distance, tourner, tournerAnneau, type Polygon, type Pt, type Ring } fr
 export interface ParamsTatami {
   /** Angle des rangées en degrés (0 = horizontal). */
   angleDeg: number;
+  /** Point d'où vient l'aiguille : le remplissage commence par la section la plus proche. */
+  depart?: Pt;
   /** Écart entre rangées en mm (densité). */
   espacement: number;
   /** Longueur maximale d'un point en mm. */
@@ -26,7 +28,7 @@ export const TATAMI_DEFAUT: ParamsTatami = {
   espacement: 0.25,
   longueurMax: 3.0,
   decalages: 4,
-  deplacementMax: 5.0,
+  deplacementMax: 25.0,
 };
 
 /** Segment d'une rangée, en repère tourné : y constant, de x1 à x2. */
@@ -160,44 +162,120 @@ export function remplirTatami(poly: Polygon, params: Partial<ParamsTatami> = {})
   const sections = construireSections(parRangee).filter((s) => s.length > 0);
   if (sections.length === 0) return [];
 
-  // Ordre des sections : plus proche voisin à partir de la première, en reliant
-  // les chemins consécutifs lorsqu'ils sont proches (un seul chemin continu).
+  // Ordre des sections : on part de la plus proche du point de départ, puis de
+  // proche en proche. Deux sections consécutives sont reliées par un trajet le
+  // long du contour (points de liaison) si la distance le permet, sinon par un saut.
   const restantes = new Set(sections);
   const chemins: Pt[][] = [];
   let courant: Pt[] = [];
-  let position: Pt | undefined;
-  let section: Section | undefined = sections[0];
+  let position: Pt | undefined = p.depart;
+  const extremites = (s: Section): [Pt, Pt] => {
+    const f = s[0]!;
+    return [tourner([f.x1, f.k * p.espacement], angleRad), tourner([f.x2, f.k * p.espacement], angleRad)];
+  };
+  const plusProche = (): Section | undefined => {
+    let meilleure: Section | undefined;
+    let dmin = Infinity;
+    for (const s of restantes) {
+      for (const e of extremites(s)) {
+        const d = position ? distance(position, e) : 0;
+        if (d < dmin) { dmin = d; meilleure = s; }
+      }
+    }
+    return meilleure;
+  };
+  const contour = new Contour(poly);
+  let section: Section | undefined = plusProche();
   while (section) {
     restantes.delete(section);
-    const premier = section[0]!;
-    const debutGauche = tourner([premier.x1, premier.k * p.espacement], angleRad);
-    const debutDroite = tourner([premier.x2, premier.k * p.espacement], angleRad);
+    const [debutGauche, debutDroite] = extremites(section);
     const commencerADroite = position ? distance(position, debutDroite) < distance(position, debutGauche) : false;
     const chemin = cheminSection(section, angleRad, p, commencerADroite);
-    if (position && distance(position, chemin[0]!) <= p.deplacementMax) {
-      courant.push(...relier(position, chemin[0]!, p.longueurMax), ...chemin);
+    const cible = chemin[0]!;
+    if (position && courant.length) {
+      const trajet = contour.trajet(position, cible, p.deplacementMax);
+      if (trajet) {
+        let prec = position;
+        for (const q of trajet) { courant.push(...relier(prec, q, p.longueurMax), q); prec = q; }
+        courant.push(...relier(prec, cible, p.longueurMax), ...chemin);
+      } else {
+        chemins.push(courant);
+        courant = chemin;
+      }
     } else {
       if (courant.length) chemins.push(courant);
       courant = chemin;
     }
     position = courant[courant.length - 1];
-    // Section suivante : la plus proche d'une de ses extrémités
-    let meilleure: Section | undefined;
-    let dmin = Infinity;
-    for (const s of restantes) {
-      const f = s[0]!;
-      for (const x of [f.x1, f.x2]) {
-        const d = distance(position!, tourner([x, f.k * p.espacement], angleRad));
-        if (d < dmin) {
-          dmin = d;
-          meilleure = s;
-        }
-      }
-    }
-    section = meilleure;
+    section = plusProche();
   }
   if (courant.length) chemins.push(courant);
   return chemins;
+}
+
+/**
+ * Trajets le long du contour d'un polygone : les extrémités de sections sont
+ * sur le bord, on peut donc relier deux sections en suivant le bord (trajet
+ * discret sous le remplissage voisin, et jamais à travers un trou).
+ */
+class Contour {
+  private readonly anneaux: Ring[];
+  private readonly cumul: number[][];
+  constructor(poly: Polygon) {
+    this.anneaux = [poly.shell, ...poly.holes];
+    this.cumul = this.anneaux.map((r) => {
+      const c = [0];
+      for (let i = 0; i < r.length; i++) c.push(c[i]! + distance(r[i]!, r[(i + 1) % r.length]!));
+      return c;
+    });
+  }
+
+  /** Anneau et abscisse curviligne du point du contour le plus proche de q. */
+  private projeter(q: Pt): { anneau: number; t: number; d: number } {
+    let meilleur = { anneau: 0, t: 0, d: Infinity };
+    this.anneaux.forEach((r, ai) => {
+      for (let i = 0; i < r.length; i++) {
+        const a = r[i]!;
+        const b = r[(i + 1) % r.length]!;
+        const dx = b[0] - a[0];
+        const dy = b[1] - a[1];
+        const l2 = dx * dx + dy * dy;
+        let u = l2 ? ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / l2 : 0;
+        u = Math.max(0, Math.min(1, u));
+        const d = distance(q, [a[0] + u * dx, a[1] + u * dy]);
+        if (d < meilleur.d) meilleur = { anneau: ai, t: this.cumul[ai]![i]! + u * Math.sqrt(l2), d };
+      }
+    });
+    return meilleur;
+  }
+
+  /**
+   * Points du contour à suivre pour aller de a à b (sans a ni b), ou undefined si
+   * les deux points ne sont pas sur le même anneau ou si le trajet est trop long.
+   */
+  trajet(a: Pt, b: Pt, longueurMax: number): Pt[] | undefined {
+    const pa = this.projeter(a);
+    const pb = this.projeter(b);
+    if (pa.d > 0.6 || pb.d > 0.6) {
+      return distance(a, b) <= longueurMax ? [] : undefined; // pas sur le bord : ligne droite si court
+    }
+    if (pa.anneau !== pb.anneau) return distance(a, b) <= longueurMax ? [] : undefined;
+    const r = this.anneaux[pa.anneau]!;
+    const c = this.cumul[pa.anneau]!;
+    const perimetre = c[r.length]!;
+    const direct = (pb.t - pa.t + perimetre) % perimetre; // sens des sommets croissants
+    const inverse = perimetre - direct;
+    if (Math.min(direct, inverse) > longueurMax) return undefined;
+    const points: Pt[] = [];
+    if (direct <= inverse) {
+      let i = (c.findIndex((v) => v > pa.t) + r.length) % r.length; // premier sommet après a
+      while (((c[i]! - pa.t + perimetre) % perimetre) < direct) { points.push(r[i]!); i = (i + 1) % r.length; }
+    } else {
+      let i = (c.findIndex((v) => v > pa.t) - 1 + r.length) % r.length; // sommet avant a
+      while (((pa.t - c[i]! + perimetre) % perimetre) < inverse) { points.push(r[i]!); i = (i - 1 + r.length) % r.length; }
+    }
+    return points;
+  }
 }
 
 /** Points intermédiaires pour aller de a à b sans dépasser la longueur maximale (a exclu, b exclu). */

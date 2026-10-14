@@ -5,11 +5,22 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "import": "./dist/node.js"
+    }
+  },
   "dependencies": {
     "@atelier/stitch-core": "0.1.0",
     "jpeg-js": "^0.4.4",
     "pngjs": "^7.0.0"
   },
-  "devDependencies": { "@types/pngjs": "^6.0.5" }
+  "devDependencies": {
+    "@types/pngjs": "^6.0.5"
+  }
 }

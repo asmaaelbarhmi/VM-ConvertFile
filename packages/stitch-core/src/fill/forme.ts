@@ -61,6 +61,8 @@ export const TISSUS: Record<string, ProfilTissu> = {
 
 export interface OptionsForme {
   angleDeg: number;
+  /** Position de l'aiguille avant cette forme (pour commencer au plus près). */
+  depart?: Pt;
   /** Forme étroite : densité plus forte et piqûres non décalées (aspect satin). */
   satin?: boolean;
   /** Nombre de décalages de piqûres (sillons) */
@@ -70,20 +72,27 @@ export interface OptionsForme {
 /** Chemins de couture (sous-couche puis remplissage) pour une forme. */
 export function broderForme(poly: Polygon, tissu: ProfilTissu, opts: OptionsForme): Pt[][] {
   const chemins: Pt[][] = [];
+  let depart = opts.depart;
+  const ajouter = (nouveaux: Pt[][]) => {
+    chemins.push(...nouveaux);
+    const dernier = nouveaux[nouveaux.length - 1];
+    if (dernier?.length) depart = dernier[dernier.length - 1]!;
+  };
   if (tissu.sousCouche) {
     for (const p of decaler(poly, -tissu.sousCoucheRetrait)) {
-      chemins.push(...remplirTatami(p, {
+      ajouter(remplirTatami(p, {
         angleDeg: (opts.angleDeg + 90) % 180,
         espacement: tissu.sousCoucheEspacement,
         longueurMax: tissu.longueurMax,
         decalages: 2,
+        ...(depart ? { depart } : {}),
       }));
     }
   }
   const compensation = tissu.compensation + (opts.satin ? 0.1 : 0);
-  const params: Partial<ParamsTatami> = opts.satin
+  const base: Partial<ParamsTatami> = opts.satin
     ? { angleDeg: opts.angleDeg, espacement: Math.max(0.18, tissu.espacement - 0.05), longueurMax: tissu.longueurMax, decalages: 1 }
     : { angleDeg: opts.angleDeg, espacement: tissu.espacement, longueurMax: tissu.longueurMax, decalages: opts.decalages ?? 4 };
-  for (const p of decaler(poly, compensation)) chemins.push(...remplirTatami(p, params));
+  for (const p of decaler(poly, compensation)) ajouter(remplirTatami(p, { ...base, ...(depart ? { depart } : {}) }));
   return chemins;
 }

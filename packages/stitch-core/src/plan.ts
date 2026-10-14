@@ -99,6 +99,10 @@ export class ConstructeurPlan {
     }
   }
 
+  positionCourante(): Pt | undefined {
+    return this.position;
+  }
+
   terminer(): Plan {
     this.terminerCouture();
     if (this.position) this.ajouter(this.position, "fin");
