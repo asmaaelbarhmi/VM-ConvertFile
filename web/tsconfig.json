@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false, "declaration": false, "noEmit": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
+    "types": ["vite/client"],
+    "paths": {
+      "@atelier/stitch-core": ["../packages/stitch-core/src/index.ts"],
+      "@atelier/image": ["../packages/image/src/index.ts"]
+    }
+  },
+  "include": ["src", "../packages/stitch-core/src/types-externes.d.ts"]
+}

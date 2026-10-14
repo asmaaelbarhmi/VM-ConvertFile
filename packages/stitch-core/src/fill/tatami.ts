@@ -28,7 +28,7 @@ export const TATAMI_DEFAUT: ParamsTatami = {
   espacement: 0.25,
   longueurMax: 3.0,
   decalages: 4,
-  deplacementMax: 25.0,
+  deplacementMax: 12.0,
 };
 
 /** Segment d'une rangée, en repère tourné : y constant, de x1 à x2. */

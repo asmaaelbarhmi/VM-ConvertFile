@@ -51,14 +51,21 @@ export function tuiler(poly: Polygon, taille = TUILE_MM): Polygon[] {
   return out;
 }
 
-/** Ordre de broderie : plus proche voisin à partir du coin haut-gauche. */
-export function ordonner(formes: Forme[]): Forme[] {
+/** Distance d'un point au contour d'une forme (approchée par ses sommets). */
+function distanceContour(p: Pt, poly: Polygon): number {
+  let d = Infinity;
+  for (const q of poly.shell) { const e = distance(p, q); if (e < d) d = e; }
+  return d;
+}
+
+/** Ordre de broderie : plus proche voisin (par le contour) à partir du coin haut-gauche. */
+export function ordonner(formes: Forme[], depart: Pt = [0, 0]): Forme[] {
   const restantes = [...formes];
   const ordre: Forme[] = [];
-  let position: Pt = [0, 0];
+  let position: Pt = depart;
   while (restantes.length) {
     let iMin = 0, dMin = Infinity;
-    restantes.forEach((f, i) => { const d = distance(position, centroide(f.poly)); if (d < dMin) { dMin = d; iMin = i; } });
+    restantes.forEach((f, i) => { const d = distanceContour(position, f.poly); if (d < dMin) { dMin = d; iMin = i; } });
     const [f] = restantes.splice(iMin, 1);
     ordre.push(f!);
     position = centroide(f!.poly);

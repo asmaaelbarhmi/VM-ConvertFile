@@ -5,7 +5,10 @@
  * 2. remplissage tatami élargi de la compensation de tirage (le tissu se resserre
  *    sous les points : on élargit légèrement chaque forme).
  */
-import type { Polygon, Pt } from "../geometry.js";
+import { aire, type Polygon, type Pt } from "../geometry.js";
+
+/** En dessous de cette surface, la sous-couche n'apporte rien (forme trop petite). */
+export const SURFACE_SOUS_COUCHE_MM2 = 25;
 import { decaler } from "../operations.js";
 import { remplirTatami, type ParamsTatami } from "./tatami.js";
 
@@ -78,7 +81,8 @@ export function broderForme(poly: Polygon, tissu: ProfilTissu, opts: OptionsForm
     const dernier = nouveaux[nouveaux.length - 1];
     if (dernier?.length) depart = dernier[dernier.length - 1]!;
   };
-  if (tissu.sousCouche) {
+  // Sous-couche seulement si la forme est assez grande pour en profiter
+  if (tissu.sousCouche && aire(poly) >= SURFACE_SOUS_COUCHE_MM2) {
     for (const p of decaler(poly, -tissu.sousCoucheRetrait)) {
       ajouter(remplirTatami(p, {
         angleDeg: (opts.angleDeg + 90) % 180,

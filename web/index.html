@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Image vers DST — Atelier</title>
+<link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+<header>
+  <h1>🧵 Image vers DST</h1>
+  <p class="sous-titre">Préparez un motif de broderie à partir d'un logo, d'un PDF ou d'un SVG. Tout se calcule dans votre navigateur : vos images ne sont envoyées nulle part.</p>
+</header>
+
+<main>
+  <section class="carte">
+    <h2><span class="num">1</span> Fichier</h2>
+    <label id="zone-depot" class="depot">
+      <input type="file" id="fichier" accept=".png,.jpg,.jpeg,.webp,.bmp,.gif,.pdf,.svg" hidden>
+      <span>Glissez une image ici ou cliquez pour choisir<br><small>PNG, JPG, WebP, BMP, GIF, PDF, SVG — 20 Mo max</small></span>
+    </label>
+    <p id="analyse-attente" class="info" hidden>Analyse en cours…</p>
+    <p id="erreur-fichier" class="bandeau erreur" hidden></p>
+  </section>
+
+  <section id="etape-reglages" class="carte" hidden>
+    <h2><span class="num">2</span> Motif et réglages</h2>
+    <div class="deux-colonnes">
+      <figure>
+        <canvas id="vignette"></canvas>
+        <figcaption id="infos-fichier"></figcaption>
+      </figure>
+      <form id="form-reglages">
+        <p class="fils">Fils détectés : <span id="pastilles"></span> <small id="nb-fils"></small></p>
+
+        <label>Largeur de la broderie (mm)
+          <input type="number" id="largeur" min="5" max="450" step="0.1" required>
+        </label>
+        <p class="aide" id="taille-aide"></p>
+
+        <label>Tissu / support
+          <select id="tissu"></select>
+        </label>
+        <p class="aide" id="tissu-conseil"></p>
+
+        <label>Machine et cadre
+          <select id="machine"></select>
+        </label>
+
+        <details>
+          <summary>Réglages avancés</summary>
+          <label>Nombre de fils (vide = automatique)
+            <input type="number" id="nb-couleurs" min="1" max="12" placeholder="auto">
+          </label>
+          <label>Couper le fil au-delà de (mm)
+            <input type="number" id="coupe" min="3" max="30" step="1" value="8">
+          </label>
+        </details>
+
+        <button type="submit" id="bouton-generer" class="principal">3 · Générer le motif</button>
+      </form>
+    </div>
+  </section>
+
+  <section id="etape-resultat" class="carte" hidden>
+    <h2><span class="num">4</span> Résultat</h2>
+    <p id="progression" class="info"><progress id="barre" max="1" value="0"></progress> <span id="progression-texte">Génération en cours…</span></p>
+    <div id="resultat" hidden>
+      <p id="resume" class="resume"></p>
+      <ul id="alertes" class="alertes"></ul>
+      <div class="deux-colonnes">
+        <figure>
+          <div id="apercu" class="apercu"></div>
+          <figcaption>Aperçu des points, tel que la machine les coudra</figcaption>
+        </figure>
+        <div>
+          <h3>Ordre des fils pour l'opérateur</h3>
+          <ol id="ordre-fils"></ol>
+          <h3>Téléchargements</h3>
+          <p id="liens" class="liens"></p>
+          <p class="avertissement">Simulez le motif sur la machine et faites un essai sur une chute de tissu avant la production.</p>
+        </div>
+      </div>
+    </div>
+    <p id="erreur" class="bandeau erreur" hidden></p>
+  </section>
+</main>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
