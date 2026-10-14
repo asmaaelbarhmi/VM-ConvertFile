@@ -32,3 +32,10 @@ npm run dev       # interface sur http://localhost:5173
 ```
 
 Node 20 ou plus récent. Aucune autre installation.
+
+## Déploiement
+
+Le site est entièrement statique : `npm run build -w web` produit `web/dist/`, à servir n'importe où
+(GitHub Pages, Netlify, Vercel, un simple serveur de fichiers). Le workflow `.github/workflows/pages.yml`
+le publie automatiquement sur GitHub Pages à chaque push sur `main` (activer Pages → Source :
+GitHub Actions dans les réglages du dépôt).

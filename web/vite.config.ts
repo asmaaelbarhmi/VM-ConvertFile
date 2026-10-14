@@ -4,6 +4,8 @@ import { defineConfig } from "vite";
 const src = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
 export default defineConfig({
+  // Sous-chemin de publication (GitHub Pages : /NomDuDepot/), racine en local
+  base: process.env.BASE_URL ?? "/",
   resolve: {
     // Les paquets sont lus directement depuis leurs sources TypeScript
     alias: {
